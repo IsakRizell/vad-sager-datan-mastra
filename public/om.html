@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F7F5F0">
-<title>Om · Ärligt talat</title>
+<title>Om · Kolla fakta</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -45,10 +45,16 @@
     border-bottom: 1px solid var(--hairline);
     flex-shrink: 0;
   }
-  .wordmark, .wordmark-link {
-    display: flex; flex-direction: column; gap: 3px;
-    min-width: 0; flex: 1;
+  .wordmark-link {
+    display: flex; align-items: center;
+    flex: 0 0 auto;
+    min-width: 0;
     text-decoration: none; color: inherit;
+  }
+  .logo-img {
+    display: block;
+    height: 38px;
+    width: auto;
   }
   .wordmark .mark {
     font-family: "Sora", -apple-system, system-ui, sans-serif;
@@ -140,6 +146,7 @@
     header { padding: 22px 24px 18px; }
     .wordmark .mark { font-size: 24px; }
     .wordmark .tagline { font-size: 11px; }
+    .logo-img { height: 46px; }
     .nav-link { font-size: 12px; }
     main { padding: 0 24px 80px; }
     h1.page-title { font-size: 44px; margin: 56px 0 32px; }
@@ -148,6 +155,7 @@
   @media (min-width: 900px) {
     header { padding: 28px 40px 24px; }
     .wordmark .mark { font-size: 28px; }
+    .logo-img { height: 54px; }
     main { padding: 0 40px 80px; }
     h1.page-title { font-size: 56px; margin: 72px 0 40px; }
   }
@@ -156,9 +164,8 @@
 <body>
 
 <header>
-  <a href="/" class="wordmark wordmark-link">
-    <span class="mark">Ärligt talat</span>
-    <span class="tagline">Faktakoll mot SCB</span>
+  <a href="/" class="wordmark-link">
+    <img src="/img/logo.png" alt="Kolla fakta" class="logo-img">
   </a>
   <div class="header-nav">
     <a href="/tips" class="nav-link">Tips</a>

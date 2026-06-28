@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 
 import { streamText, type CoreMessage } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
@@ -55,6 +56,7 @@ function readHtml(name: string): string {
   }
   return readFileSync(resolve(`public/${name}`), 'utf8');
 }
+app.use('/img/*', serveStatic({ root: './public' }));
 app.get('/', (c) => c.html(readHtml('index.html')));
 app.get('/tips', (c) => c.html(readHtml('tips.html')));
 app.get('/om', (c) => c.html(readHtml('om.html')));

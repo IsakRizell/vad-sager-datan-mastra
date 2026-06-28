@@ -650,6 +650,8 @@ form.addEventListener('submit', async (e) => {
   submitBtn.textContent = 'Granskar';
   submitBtn.classList.remove('stopping');
 
+  let sawTerminator = false;  // 'done' eller 'finish' = ren avslutning
+
   startAgentTurn();
   forceScrollToBottom();
 
@@ -688,9 +690,15 @@ form.addEventListener('submit', async (e) => {
         if (!type) continue;
         let parsed = null;
         if (data) { try { parsed = JSON.parse(data); } catch { parsed = data; } }
+        if (type === 'done' || type === 'finish' || type === 'interrupted') sawTerminator = true;
         handleEvent(type, parsed);
         scrollToBottomIfAtBottom();
       }
+    }
+    // Streamet stängde — om vi inte sett done/finish är det troligen serversidans connection drop
+    // (fly.io kallstart, proxy-timeout, eller agenten kraschade utan att skicka error).
+    if (!sawTerminator) {
+      showError('Anslutningen bröts. Försök igen (servern kan ha startat om).');
     }
   } catch (err) {
     showError('Anslutningsfel: ' + err.message);
@@ -775,9 +783,20 @@ function handleEvent(type, data) {
     case 'done':
       if (currentStatusEl) currentStatusEl.textContent = '';
       break;
-    case 'error':
-      showError(typeof data === 'string' ? data : (data?.error ?? JSON.stringify(data)));
+    case 'error': {
+      let msg;
+      if (typeof data === 'string') msg = data;
+      else if (typeof data?.error === 'string') msg = data.error;
+      else if (typeof data?.error?.message === 'string') msg = data.error.message;
+      else if (typeof data?.message === 'string') msg = data.message;
+      else if (data?.error?.responseBody) {
+        try { msg = (JSON.parse(data.error.responseBody)?.error?.message) ?? data.error.responseBody.slice(0, 240); }
+        catch { msg = String(data.error.responseBody).slice(0, 240); }
+      }
+      else msg = JSON.stringify(data).slice(0, 240);
+      showError(msg);
       break;
+    }
     case 'interrupted': {
       if (currentStatusEl) currentStatusEl.textContent = '';
       const msg = document.createElement('div');

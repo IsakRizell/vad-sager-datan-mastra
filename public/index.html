@@ -206,10 +206,28 @@
   .step-body pre.error { color: var(--err); background: #FBF0F0; }
 
   /* ── Final answer ───────────────────────────────────── */
+  .thought-stream {
+    display: none;
+    border-left: 1px solid var(--hairline);
+    padding: 4px 0 4px 14px;
+    margin: 10px 0 2px;
+    max-width: 620px;
+  }
+  .thought-stream.active { display: block; }
+  .thought-block {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+    margin: 0 0 8px;
+    font-style: italic;
+  }
+  .thought-block:last-child { margin-bottom: 0; }
+  .thought-block p { margin: 0; }
+
   .final-answer {
     background: transparent; border: none;
     border-top: 1px solid var(--hairline-strong);
-    padding: 22px 0 0; margin-top: 6px;
+    padding: 22px 0 0; margin-top: 14px;
     max-width: 680px;
     font-size: 16px; line-height: 1.6;
     overflow-wrap: anywhere;
@@ -522,6 +540,7 @@ fileInput.addEventListener('change', async () => {
 let currentAgentTurn = null;
 let currentStepsEl = null;
 let currentStatusEl = null;
+let currentThoughtEl = null;
 let currentFinalEl = null;
 let verdictBuffer = '';
 let toolCardsByCallId = new Map();
@@ -810,18 +829,36 @@ function startAgentTurn() {
   currentStatusEl.className = 'status';
   currentStatusEl.textContent = 'Tänker…';
 
+  currentThoughtEl = document.createElement('div');
+  currentThoughtEl.className = 'thought-stream';
+
   currentFinalEl = document.createElement('div');
   currentFinalEl.className = 'final-answer';
   currentFinalEl.style.display = 'none';
 
   currentAgentTurn.appendChild(currentStepsEl);
   currentAgentTurn.appendChild(currentStatusEl);
+  currentAgentTurn.appendChild(currentThoughtEl);
   currentAgentTurn.appendChild(currentFinalEl);
   messagesEl.appendChild(currentAgentTurn);
 
   verdictBuffer = '';
   toolCardsByCallId = new Map();
   stepCounter = 0;
+}
+
+function freezeCurrentTextAsThought() {
+  const t = verdictBuffer.trim();
+  if (!t) return;
+  const block = document.createElement('div');
+  block.className = 'thought-block';
+  // Plain text rendering — running commentary är aldrig markdown.
+  block.textContent = t;
+  currentThoughtEl.appendChild(block);
+  currentThoughtEl.classList.add('active');
+  verdictBuffer = '';
+  currentFinalEl.innerHTML = '';
+  currentFinalEl.style.display = 'none';
 }
 
 function handleEvent(type, data) {
@@ -929,6 +966,9 @@ function friendlyStatus(toolName) {
 
 function addToolCall(data) {
   if (!data) return;
+  // Innan vi startar nästa steg, frys det löpande pratet som en tanke.
+  freezeCurrentTextAsThought();
+
   const callId = data.toolCallId || data.id || `tc-${Date.now()}-${Math.random()}`;
   const toolName = data.toolName || data.name || 'okänt';
   const args = data.args || data.arguments || {};

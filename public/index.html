@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vad säger datan?</title>
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --bg-soft: #F6F4F0;
+    --fg: #111111;
+    --muted: #6B6B6B;
+    --hairline: #E5E5E5;
+    --hairline-strong: #1A1A1A;
+    --code-bg: #F6F4F0;
+    --err: #8A1F1F;
+    --plan: #2F5D3A;
+    --action: #1A1A1A;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: "Helvetica Neue", Helvetica, "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column;
+  }
+
+  ::selection { background: #111; color: #fff; }
+
+  header {
+    padding: 28px 40px 24px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    border-bottom: 1px solid var(--hairline);
+    flex-shrink: 0;
+  }
+  .wordmark { display: flex; flex-direction: column; gap: 4px; }
+  .wordmark .mark {
+    font-size: 13px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--fg);
+  }
+  .wordmark .tagline {
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  #reset-btn {
+    background: transparent; color: var(--fg);
+    border: none; padding: 0;
+    font-family: inherit; font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; position: relative;
+  }
+  #reset-btn::after {
+    content: ""; position: absolute;
+    left: 0; right: 0; bottom: -3px; height: 1px;
+    background: var(--fg); transform: scaleX(0); transform-origin: left;
+    transition: transform 200ms ease-out;
+  }
+  #reset-btn:hover::after { transform: scaleX(1); }
+
+  main {
+    flex: 1; width: 100%; max-width: 880px; margin: 0 auto;
+    padding: 0 40px;
+    display: flex; flex-direction: column; min-height: 0;
+  }
+
+  #messages {
+    flex: 1; overflow-y: auto;
+    padding: 56px 0 40px;
+    display: flex; flex-direction: column; gap: 64px;
+    scroll-behavior: smooth;
+  }
+  #messages:empty { display: block; }
+  #messages:empty::before {
+    content: "Introduction";
+    display: block; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); margin: 96px 0 16px;
+  }
+  #messages:empty::after {
+    content: "Klistra in ett politiker-citat, en länk eller en screenshot. Agenten letar SCB-data, jämför och redovisar varje steg. Följdfrågor i samma chatt.";
+    display: block; font-size: 17px; line-height: 1.5; color: var(--fg);
+    max-width: 580px;
+  }
+
+  .turn { display: flex; flex-direction: column; gap: 14px; }
+
+  .turn.user { align-items: flex-start; }
+  .turn.user::before {
+    content: "You";
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: -6px;
+  }
+  .user .bubble {
+    background: transparent; color: var(--fg);
+    padding: 0 0 0 16px; border-radius: 0;
+    max-width: 100%; white-space: pre-wrap;
+    font-size: 17px; line-height: 1.5;
+    border-left: 1px solid var(--hairline-strong);
+  }
+  .user .images {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin: 8px 0 0 16px;
+  }
+  .user .images img {
+    max-width: 240px; max-height: 240px;
+    border: 1px solid var(--hairline-strong);
+    object-fit: contain;
+  }
+
+  .turn.agent::before {
+    content: "Data";
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: -6px;
+  }
+
+  .agent .steps {
+    display: flex; flex-direction: column;
+    border-top: 1px solid var(--hairline);
+  }
+
+  details.step {
+    background: transparent; border: none;
+    border-bottom: 1px solid var(--hairline);
+  }
+  details.step > summary {
+    list-style: none; cursor: pointer;
+    padding: 14px 0;
+    display: flex; gap: 20px; align-items: baseline;
+    user-select: none;
+  }
+  details.step > summary::-webkit-details-marker { display: none; }
+  details.step > summary::before {
+    content: "+"; color: var(--muted);
+    font-size: 14px; font-weight: 400; width: 12px;
+    transition: transform 200ms ease-out;
+  }
+  details.step[open] > summary::before { content: "−"; }
+
+  .step-badge {
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); min-width: 72px;
+  }
+  .step.kind-action .step-badge { color: var(--action); }
+  .step.running .step-badge { color: var(--plan); }
+
+  .step-title {
+    flex: 1; color: var(--fg);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+  }
+  .step-meta {
+    color: var(--muted); font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+  .step-body { padding: 4px 0 22px 32px; }
+  .step-body h4 {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--muted); margin: 18px 0 8px;
+    font-weight: 500;
+  }
+  .step-body h4:first-child { margin-top: 0; }
+  .step-body pre {
+    background: var(--code-bg);
+    padding: 14px 16px; border-radius: 0;
+    overflow-x: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px; line-height: 1.55;
+    margin: 0; white-space: pre-wrap; word-break: break-word;
+    color: #1a1a1a;
+  }
+  .step-body pre.observation { color: #1a1a1a; }
+  .step-body pre.error { color: var(--err); background: #FBF0F0; }
+
+  .final-answer {
+    background: transparent; border: none;
+    border-top: 1px solid var(--hairline-strong);
+    padding: 28px 0 0; margin-top: 8px;
+    max-width: 680px; font-size: 17px; line-height: 1.6;
+  }
+  .final-answer::before {
+    content: "Verdict";
+    display: block; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 16px;
+  }
+  .final-answer h1, .final-answer h2, .final-answer h3 {
+    line-height: 1.2; margin: 28px 0 10px;
+    font-weight: 500; letter-spacing: -0.005em;
+  }
+  .final-answer h1 { font-size: 28px; }
+  .final-answer h2 { font-size: 22px; }
+  .final-answer h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--muted); margin-top: 24px; font-weight: 500;
+  }
+  .final-answer h1:first-of-type, .final-answer h2:first-of-type, .final-answer h3:first-of-type { margin-top: 0; }
+  .final-answer table {
+    border-collapse: collapse; margin: 18px 0; font-size: 14px;
+    width: 100%; font-variant-numeric: tabular-nums;
+  }
+  .final-answer th, .final-answer td {
+    border: none; border-bottom: 1px solid var(--hairline);
+    padding: 10px 14px 10px 0; text-align: left; vertical-align: top;
+  }
+  .final-answer th {
+    background: transparent; font-weight: 500;
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1px solid var(--hairline-strong);
+  }
+  .final-answer ul { padding-left: 18px; margin: 12px 0; }
+  .final-answer li { margin: 4px 0; }
+  .final-answer code {
+    background: var(--code-bg); padding: 1px 6px; border-radius: 0;
+    font-size: 0.88em;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .final-answer strong { font-weight: 500; }
+
+  .status {
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .error-msg {
+    color: var(--err);
+    padding: 14px 0 0; border-top: 1px solid var(--err);
+    margin-top: 12px; font-size: 14px;
+  }
+  .interrupted-msg {
+    color: var(--muted); padding: 10px 0;
+    font-size: 13px; font-style: italic;
+  }
+
+  /* Jump-to-bottom-pil när användaren scrollat upp */
+  #jump-down {
+    position: fixed;
+    right: 32px; bottom: 132px;
+    width: 38px; height: 38px;
+    border-radius: 19px;
+    background: var(--fg); color: #fff;
+    border: none; cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+    font-size: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    z-index: 10;
+  }
+  #jump-down.visible { display: flex; }
+
+  #input-area {
+    padding: 24px 40px 32px;
+    border-top: 1px solid var(--hairline);
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+  #input-area.dragging { background: var(--bg-soft); }
+  #image-strip {
+    max-width: 880px; margin: 0 auto 12px;
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  #image-strip:empty { display: none; }
+  .thumb {
+    position: relative;
+    width: 72px; height: 72px;
+    border: 1px solid var(--hairline-strong);
+    background: var(--code-bg);
+    overflow: hidden;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb button {
+    position: absolute;
+    top: 3px; right: 3px;
+    width: 20px; height: 20px;
+    background: var(--fg); color: #fff;
+    border: none; border-radius: 10px;
+    font-size: 11px; line-height: 20px;
+    padding: 0; cursor: pointer;
+    font-family: inherit;
+  }
+  #form {
+    display: flex; gap: 20px; align-items: flex-end;
+    max-width: 880px; margin: 0 auto;
+  }
+  #message {
+    flex: 1; padding: 12px 0;
+    background: transparent; color: var(--fg);
+    border: none; border-bottom: 1px solid var(--hairline-strong);
+    border-radius: 0;
+    font-family: inherit; font-size: 16px; resize: none;
+    min-height: 44px; max-height: 180px; line-height: 1.4;
+  }
+  #message::placeholder { color: var(--muted); }
+  #message:focus { outline: none; border-bottom-color: var(--fg); }
+
+  #submit {
+    padding: 14px 28px;
+    background: var(--fg); color: #FFFFFF;
+    border: 1px solid var(--fg); border-radius: 0;
+    font-family: inherit; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    cursor: pointer; min-height: 44px;
+    transition: background 150ms ease-out, color 150ms ease-out;
+  }
+  #submit:hover { background: #FFFFFF; color: var(--fg); }
+  #submit:disabled { background: var(--fg); color: #FFFFFF; opacity: 0.35; cursor: not-allowed; }
+  #submit.stopping { background: var(--err); border-color: var(--err); opacity: 1; }
+
+  .examples {
+    max-width: 880px; margin: 18px auto 0;
+    display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap;
+  }
+  .examples .label {
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .examples a {
+    color: var(--fg); text-decoration: none;
+    font-size: 13px; cursor: pointer;
+    position: relative; padding-bottom: 2px;
+  }
+  .examples a::after {
+    content: ""; position: absolute;
+    left: 0; right: 0; bottom: 0; height: 1px;
+    background: var(--fg); transform: scaleX(0); transform-origin: left;
+    transition: transform 200ms ease-out;
+  }
+  .examples a:hover::after { transform: scaleX(1); }
+  .examples .hint {
+    margin-left: auto; font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .examples .hint kbd {
+    background: transparent; border: 1px solid var(--hairline);
+    padding: 1px 6px; border-radius: 0; font-family: inherit; font-size: 10px;
+  }
+
+  @media (max-width: 640px) {
+    header { padding: 20px 20px 16px; }
+    main { padding: 0 20px; }
+    #input-area { padding: 18px 20px 24px; }
+    #messages { padding: 32px 0 24px; gap: 48px; }
+    #messages:empty::before { margin-top: 48px; }
+    #messages:empty::after { font-size: 15px; }
+    .user .bubble { font-size: 15px; }
+    .final-answer { font-size: 15px; }
+    .final-answer h1 { font-size: 22px; }
+    .final-answer h2 { font-size: 18px; }
+    #form { gap: 12px; }
+    #submit { padding: 14px 18px; }
+    #jump-down { right: 16px; bottom: 110px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">
+    <span class="mark">Vad säger datan</span>
+    <span class="tagline">Faktakoll mot SCB · Mastra</span>
+  </div>
+  <button id="reset-btn" type="button">Ny chatt</button>
+</header>
+
+<main>
+  <div id="messages"></div>
+
+  <button id="jump-down" type="button" title="Hoppa ner">↓</button>
+
+  <div id="input-area">
+    <div id="image-strip"></div>
+    <form id="form">
+      <textarea id="message" rows="1" placeholder="Klistra in citat, länk eller screenshot (Cmd+V)…"></textarea>
+      <button type="submit" id="submit">Skicka</button>
+    </form>
+    <div class="examples">
+      <span class="label">Förslag</span>
+      <a data-fill="Sverige är i en djup lågkonjunktur men svensk ekonomi är inte i kris.">Lågkonjunktur</a>
+      <a data-fill="Inflationen i Sverige är nu nere på 0.8 procent, vilket är långt under Riksbankens mål om 2 procent.">Inflation</a>
+      <a data-fill="Över 700 000 personer lever i fattigdom i Sverige. Det är dubbelt så många som när regeringen Kristersson tillträdde.">Fattigdom</a>
+      <span class="hint"><kbd>Esc</kbd> avbryter · <kbd>Cmd+V</kbd> bild</span>
+    </div>
+  </div>
+</main>
+
+<script>
+const form = document.getElementById('form');
+const msgInput = document.getElementById('message');
+const submitBtn = document.getElementById('submit');
+const messagesEl = document.getElementById('messages');
+const resetBtn = document.getElementById('reset-btn');
+const inputArea = document.getElementById('input-area');
+const imageStrip = document.getElementById('image-strip');
+const jumpDown = document.getElementById('jump-down');
+
+let currentAgentTurn = null;
+let currentStepsEl = null;
+let currentStatusEl = null;
+let currentFinalEl = null;
+let verdictBuffer = '';
+let toolCardsByCallId = new Map();
+let stepCounter = 0;
+let isStreaming = false;
+let userIsAtBottom = true;
+let pendingImages = [];  // {dataUrl, mediaType}
+
+// ── Smart scroll ──────────────────────────────────────────────────────
+const NEAR_BOTTOM_PX = 80;
+
+function recomputeAtBottom() {
+  const dist = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+  userIsAtBottom = dist < NEAR_BOTTOM_PX;
+  jumpDown.classList.toggle('visible', !userIsAtBottom && isStreaming);
+}
+messagesEl.addEventListener('scroll', recomputeAtBottom);
+jumpDown.addEventListener('click', () => {
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  userIsAtBottom = true;
+  jumpDown.classList.remove('visible');
+});
+
+function scrollToBottomIfAtBottom() {
+  if (userIsAtBottom) {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  } else {
+    jumpDown.classList.toggle('visible', isStreaming);
+  }
+}
+function forceScrollToBottom() {
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  userIsAtBottom = true;
+  jumpDown.classList.remove('visible');
+}
+
+// ── Bilder: paste, drag-drop, resize ──────────────────────────────────
+async function readFileAsImage(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function resizeImage(file, maxWidth = 1280, quality = 0.85) {
+  const img = await readFileAsImage(file);
+  if (!img) return null;
+  const scale = Math.min(1, maxWidth / img.naturalWidth);
+  const w = Math.round(img.naturalWidth * scale);
+  const h = Math.round(img.naturalHeight * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  // JPEG ger ~10x mindre payload än PNG. Förlust är försumbar för tweets.
+  const dataUrl = canvas.toDataURL('image/jpeg', quality);
+  return { dataUrl, mediaType: 'image/jpeg' };
+}
+
+async function addImageFile(file) {
+  if (!file.type.startsWith('image/')) return;
+  if (pendingImages.length >= 6) return;
+  const resized = await resizeImage(file);
+  if (!resized) return;
+  pendingImages.push(resized);
+  renderThumbs();
+}
+
+function renderThumbs() {
+  imageStrip.innerHTML = '';
+  pendingImages.forEach((img, i) => {
+    const thumb = document.createElement('div');
+    thumb.className = 'thumb';
+    thumb.innerHTML = `<img src="${img.dataUrl}"><button type="button" data-i="${i}" title="Ta bort">×</button>`;
+    imageStrip.appendChild(thumb);
+  });
+  imageStrip.querySelectorAll('button').forEach((b) => {
+    b.addEventListener('click', () => {
+      const i = Number(b.dataset.i);
+      pendingImages.splice(i, 1);
+      renderThumbs();
+    });
+  });
+}
+
+document.addEventListener('paste', async (e) => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (file) await addImageFile(file);
+    }
+  }
+});
+
+inputArea.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  inputArea.classList.add('dragging');
+});
+inputArea.addEventListener('dragleave', () => inputArea.classList.remove('dragging'));
+inputArea.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  inputArea.classList.remove('dragging');
+  const files = Array.from(e.dataTransfer?.files ?? []);
+  for (const file of files) await addImageFile(file);
+});
+
+// ── Form-handler ──────────────────────────────────────────────────────
+document.querySelectorAll('.examples a').forEach(a => {
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    msgInput.value = a.dataset.fill;
+    msgInput.focus();
+    autoResize();
+  });
+});
+
+msgInput.addEventListener('input', autoResize);
+msgInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    form.requestSubmit();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && isStreaming) {
+    e.preventDefault();
+    fetch('/stop', { method: 'POST' });
+    submitBtn.textContent = 'Stoppar';
+    submitBtn.classList.add('stopping');
+  }
+});
+
+resetBtn.addEventListener('click', async () => {
+  await fetch('/reset', { method: 'POST' });
+  messagesEl.innerHTML = '';
+});
+
+function autoResize() {
+  msgInput.style.height = 'auto';
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 180) + 'px';
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const message = msgInput.value.trim();
+  const images = pendingImages.slice();
+  if (!message && images.length === 0) return;
+
+  addUserMessage(message, images);
+  msgInput.value = '';
+  pendingImages = [];
+  renderThumbs();
+  autoResize();
+  isStreaming = true;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Granskar';
+  submitBtn.classList.remove('stopping');
+
+  startAgentTurn();
+  forceScrollToBottom();
+
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        images: images.map((i) => i.dataUrl),
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+      showError(err.detail || res.status);
+      return;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      pending += decoder.decode(value, { stream: true });
+      const chunks = pending.split('\n\n');
+      pending = chunks.pop();
+      for (const raw of chunks) {
+        if (!raw.trim()) continue;
+        const lines = raw.split('\n');
+        let type = '';
+        let data = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) type = line.slice(7).trim();
+          else if (line.startsWith('data: ')) data = line.slice(6);
+        }
+        if (!type) continue;
+        let parsed = null;
+        if (data) { try { parsed = JSON.parse(data); } catch { parsed = data; } }
+        handleEvent(type, parsed);
+        scrollToBottomIfAtBottom();
+      }
+    }
+  } catch (err) {
+    showError('Anslutningsfel: ' + err.message);
+  } finally {
+    if (currentStatusEl) currentStatusEl.textContent = '';
+    isStreaming = false;
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Skicka';
+    submitBtn.classList.remove('stopping');
+    jumpDown.classList.remove('visible');
+  }
+});
+
+function addUserMessage(text, images) {
+  const turn = document.createElement('div');
+  turn.className = 'turn user';
+  if (text) {
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    turn.appendChild(bubble);
+  }
+  if (images && images.length) {
+    const wrap = document.createElement('div');
+    wrap.className = 'images';
+    images.forEach((img) => {
+      const i = document.createElement('img');
+      i.src = img.dataUrl;
+      wrap.appendChild(i);
+    });
+    turn.appendChild(wrap);
+  }
+  messagesEl.appendChild(turn);
+}
+
+function startAgentTurn() {
+  currentAgentTurn = document.createElement('div');
+  currentAgentTurn.className = 'turn agent';
+
+  currentStepsEl = document.createElement('div');
+  currentStepsEl.className = 'steps';
+
+  currentStatusEl = document.createElement('div');
+  currentStatusEl.className = 'status';
+  currentStatusEl.textContent = 'Agenten startar';
+
+  currentFinalEl = document.createElement('div');
+  currentFinalEl.className = 'final-answer';
+  currentFinalEl.style.display = 'none';
+
+  currentAgentTurn.appendChild(currentStepsEl);
+  currentAgentTurn.appendChild(currentStatusEl);
+  currentAgentTurn.appendChild(currentFinalEl);
+  messagesEl.appendChild(currentAgentTurn);
+
+  verdictBuffer = '';
+  toolCardsByCallId = new Map();
+  stepCounter = 0;
+}
+
+function handleEvent(type, data) {
+  switch (type) {
+    case 'text-delta': {
+      const delta = (data && (data.textDelta ?? data.delta ?? '')) || '';
+      if (delta) {
+        verdictBuffer += delta;
+        currentFinalEl.innerHTML = renderMarkdown(verdictBuffer);
+        currentFinalEl.style.display = 'block';
+      }
+      if (currentStatusEl) currentStatusEl.textContent = 'Skriver svar';
+      break;
+    }
+    case 'tool-call': addToolCall(data); break;
+    case 'tool-result': addToolResult(data); break;
+    case 'reasoning':
+    case 'reasoning-delta': break;
+    case 'step-start':
+      if (currentStatusEl) currentStatusEl.textContent = 'Tänker';
+      break;
+    case 'step-finish': break;
+    case 'finish':
+    case 'done':
+      if (currentStatusEl) currentStatusEl.textContent = '';
+      break;
+    case 'error':
+      showError(typeof data === 'string' ? data : (data?.error ?? JSON.stringify(data)));
+      break;
+    case 'interrupted': {
+      if (currentStatusEl) currentStatusEl.textContent = '';
+      const msg = document.createElement('div');
+      msg.className = 'interrupted-msg';
+      msg.textContent = '⏹ ' + String(data ?? 'Stoppad');
+      currentAgentTurn.appendChild(msg);
+      break;
+    }
+    default: break;
+  }
+}
+
+function addToolCall(data) {
+  if (!data) return;
+  const callId = data.toolCallId || data.id || `tc-${Date.now()}-${Math.random()}`;
+  const toolName = data.toolName || data.name || 'okänt';
+  const args = data.args || data.arguments || {};
+  const argsStr = JSON.stringify(args);
+  const argsShort = argsStr.length > 80 ? argsStr.slice(0, 77) + '…' : argsStr;
+  stepCounter++;
+
+  const det = document.createElement('details');
+  det.className = 'step kind-action running';
+  det.dataset.callId = callId;
+  det.innerHTML = `
+    <summary>
+      <span class="step-badge">Steg ${String(stepCounter).padStart(2, '0')}</span>
+      <span class="step-title">${escapeHtml(toolName)}(${escapeHtml(argsShort)})</span>
+      <span class="step-meta">Kör…</span>
+    </summary>
+    <div class="step-body"></div>
+  `;
+  const body = det.querySelector('.step-body');
+  body.appendChild(makeSection('Argument', JSON.stringify(args, null, 2), 'thought'));
+  body.appendChild(makeSection('Resultat', '(väntar)', 'observation'));
+  currentStepsEl.appendChild(det);
+  toolCardsByCallId.set(callId, det);
+
+  if (currentStatusEl) currentStatusEl.textContent = `Anropar ${toolName}`;
+}
+
+function addToolResult(data) {
+  if (!data) return;
+  const callId = data.toolCallId || data.id;
+  const det = callId ? toolCardsByCallId.get(callId) : null;
+  if (!det) return;
+
+  const result = data.result ?? data.output ?? '';
+  const resultStr = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+  const display = resultStr.length > 4000
+    ? resultStr.slice(0, 4000) + '\n\n[…trunkerat, totalt ' + resultStr.length + ' tecken]'
+    : resultStr;
+
+  const body = det.querySelector('.step-body');
+  const headers = body.querySelectorAll('h4');
+  for (const h of headers) {
+    if (h.textContent === 'Resultat') {
+      const pre = h.nextElementSibling;
+      if (pre) pre.textContent = display;
+      break;
+    }
+  }
+  det.classList.remove('running');
+  const meta = det.querySelector('.step-meta');
+  if (meta) meta.textContent = 'OK';
+}
+
+function makeSection(title, body, klass) {
+  const wrap = document.createElement('div');
+  const h = document.createElement('h4');
+  h.textContent = title;
+  const pre = document.createElement('pre');
+  pre.className = klass;
+  pre.textContent = String(body);
+  wrap.appendChild(h);
+  wrap.appendChild(pre);
+  return wrap;
+}
+
+function showError(text) {
+  if (currentAgentTurn) {
+    const err = document.createElement('div');
+    err.className = 'error-msg';
+    err.textContent = 'Fel: ' + text;
+    currentAgentTurn.appendChild(err);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderMarkdown(md) {
+  let s = escapeHtml(md);
+  s = s.replace(/^\|(.+)\|[ \t]*\n\|([\s:|\-]+)\|[ \t]*\n((?:\|.*\|[ \t]*\n?)+)/gm, (_m, hdr, _sep, rows) => {
+    const ths = hdr.split('|').map(c => c.trim()).filter(c => c.length).map(c => `<th>${c}</th>`).join('');
+    const trs = rows.trim().split('\n').map(line => {
+      const tds = line.replace(/^\||\|$/g, '').split('|').map(c => c.trim()).map(c => `<td>${c}</td>`).join('');
+      return `<tr>${tds}</tr>`;
+    }).join('');
+    return `<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+  });
+  s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  s = s.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  s = s.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  s = s.replace(/(?:^[-*] .+\n?)+/gm, (block) => {
+    const items = block.trim().split('\n').map(l => `<li>${l.replace(/^[-*] /, '')}</li>`).join('');
+    return `<ul>${items}</ul>`;
+  });
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(?<![*\w])\*([^*\n]+)\*(?!\w)/g, '<em>$1</em>');
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  return s.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+}
+</script>
+</body>
+</html>

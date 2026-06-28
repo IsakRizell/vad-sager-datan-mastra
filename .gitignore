@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.env
+memory.db
+memory.db-shm
+memory.db-wal
+.mastra/

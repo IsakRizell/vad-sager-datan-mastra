@@ -47,15 +47,17 @@ function getSession(sid: string): Session {
 const app = new Hono();
 // Läs HTML på varje request i dev (gör CSS-iteration snabb).
 // I prod (NODE_ENV=production) cachar vi en gång.
-let cachedHtml: string | null = null;
-function indexHtml(): string {
+const htmlCache = new Map<string, string>();
+function readHtml(name: string): string {
   if (process.env.NODE_ENV === 'production') {
-    if (!cachedHtml) cachedHtml = readFileSync(resolve('public/index.html'), 'utf8');
-    return cachedHtml;
+    if (!htmlCache.has(name)) htmlCache.set(name, readFileSync(resolve(`public/${name}`), 'utf8'));
+    return htmlCache.get(name)!;
   }
-  return readFileSync(resolve('public/index.html'), 'utf8');
+  return readFileSync(resolve(`public/${name}`), 'utf8');
 }
-app.get('/', (c) => c.html(indexHtml()));
+app.get('/', (c) => c.html(readHtml('index.html')));
+app.get('/tips', (c) => c.html(readHtml('tips.html')));
+app.get('/om', (c) => c.html(readHtml('om.html')));
 
 app.post('/chat', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
@@ -107,10 +109,11 @@ app.post('/chat', async (c) => {
 
   const sidShort = shortenSid(sid);
   const turnStart = Date.now();
+  // PRIVACY: vi loggar aldrig användarens meddelande, varken text, längd eller
+  // tool-args. Bara teknik-metrik som vi behöver för felsökning och kostnadskoll.
   log.info('chat_start', {
     sid: sidShort,
-    msg_preview: message.slice(0, 120),
-    msg_len: message.length,
+    has_text: message.length > 0,
     images: images.length,
     history_len: session.history.length,
   });
@@ -140,32 +143,29 @@ app.post('/chat', async (c) => {
         if (ac.signal.aborted) break;
 
         if (part.type === 'error') {
-          try { log.error('stream_error', { sid: sidShort, error: JSON.stringify(part.error).slice(0, 500) }); }
-          catch { log.error('stream_error', { sid: sidShort, error: String(part.error).slice(0, 500) }); }
+          // PRIVACY: part.error kan innehålla toolArgs eller hela API-payloaden.
+          // Logga bara error-namnet och eventuell tool som triggade det.
+          const errAny: any = part.error;
+          log.error('stream_error', {
+            sid: sidShort,
+            error_name: errAny?.name ?? 'Error',
+            tool: errAny?.toolName,
+          });
           continue;
         }
 
         if (part.type === 'step-start') stepCount++;
         if (part.type === 'tool-call') {
           toolCallCount++;
-          log.info('tool_call', {
-            sid: sidShort,
-            tool: part.toolName,
-            args: JSON.stringify(part.args).slice(0, 200),
-          });
+          // PRIVACY: bara verktygsnamnet, inte arg (kan avslöja vad användaren undersöker).
+          log.info('tool_call', { sid: sidShort, tool: part.toolName });
         }
         if (part.type === 'tool-result') {
           const r: any = part.result;
           const failed = r && typeof r === 'object' && r.ok === false;
           if (failed) toolErrorCount++;
-          log.info('tool_result', {
-            sid: sidShort,
-            tool: part.toolName,
-            ok: !failed,
-            preview: typeof r === 'string'
-              ? r.slice(0, 120)
-              : JSON.stringify(r).slice(0, 120),
-          });
+          // PRIVACY: ingen preview, bara tool-namn och om det gick.
+          log.info('tool_result', { sid: sidShort, tool: part.toolName, ok: !failed });
         }
         if (part.type === 'text-delta') textChars += (part.textDelta ?? '').length;
 
@@ -191,7 +191,6 @@ app.post('/chat', async (c) => {
         steps: stepCount,
         tools: toolCallCount,
         tool_errors: toolErrorCount,
-        text_chars: textChars,
         in_tokens: usage?.promptTokens,
         out_tokens: usage?.completionTokens,
       });
@@ -199,12 +198,14 @@ app.post('/chat', async (c) => {
       await send('done', '');
     } catch (err: any) {
       const msg = err?.message ?? String(err);
+      // PRIVACY: error-meddelandet kan innehålla request-payload (system prompt +
+      // user message). Logga bara felnamn/typ, inte meddelandet.
       log.error('chat_error', {
         sid: sidShort,
         dur_ms: Date.now() - turnStart,
         steps: stepCount,
         tools: toolCallCount,
-        error: msg.slice(0, 500),
+        error_name: err?.name ?? 'Error',
       });
       if (err?.name === 'AbortError' || ac.signal.aborted) {
         await send('interrupted', 'Stoppad av användare.');

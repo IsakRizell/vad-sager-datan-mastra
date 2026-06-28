@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F7F5F0">
+<title>Om · Ärligt talat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #F7F5F0;
+    --bg-soft: #EFEDE7;
+    --fg: #1F2937;
+    --muted: #6B6B6B;
+    --hairline: #E5E5E5;
+    --hairline-strong: #1A1A1A;
+  }
+
+  * { box-sizing: border-box; min-width: 0; }
+  html, body { height: 100%; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue", Helvetica, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  ::selection { background: #111; color: #fff; }
+
+  header {
+    padding: 16px 16px 14px;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--hairline);
+    flex-shrink: 0;
+  }
+  .wordmark, .wordmark-link {
+    display: flex; flex-direction: column; gap: 3px;
+    min-width: 0; flex: 1;
+    text-decoration: none; color: inherit;
+  }
+  .wordmark .mark {
+    font-family: "Sora", -apple-system, system-ui, sans-serif;
+    font-size: 20px; font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #C59B3A;
+    white-space: nowrap;
+    line-height: 1.1;
+  }
+  .wordmark .tagline {
+    font-family: "Sora", -apple-system, system-ui, sans-serif;
+    font-size: 10px; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .header-nav {
+    display: flex; align-items: center; gap: 18px;
+    flex-shrink: 0;
+  }
+  .header-nav {
+    display: flex; flex-direction: row; align-items: center;
+    gap: 14px; flex-shrink: 0; flex-wrap: nowrap;
+  }
+  .nav-link {
+    background: transparent; color: var(--fg);
+    border: none;
+    padding: 8px 4px;
+    font-family: inherit; font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; position: relative;
+    flex-shrink: 0;
+    min-height: 44px;
+    display: flex; align-items: center;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .nav-link::after {
+    content: ""; position: absolute;
+    left: 4px; right: 4px; bottom: 4px; height: 1px;
+    background: var(--fg); transform: scaleX(0); transform-origin: left;
+    transition: transform 200ms ease-out;
+  }
+  .nav-link:hover::after { transform: scaleX(1); }
+
+  main {
+    flex: 1; width: 100%; max-width: 720px; margin: 0 auto;
+    padding: 0 16px 80px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  h1.page-title {
+    font-family: "Sora", -apple-system, system-ui, sans-serif;
+    font-size: 36px; font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 40px 0 28px;
+    color: var(--fg);
+  }
+
+  .om-content {
+    font-family: "Inter", sans-serif;
+    font-size: 16px; line-height: 1.7;
+    color: var(--fg);
+    max-width: 640px;
+  }
+  .om-content p { margin: 0 0 18px; }
+  .om-content p:last-child { margin-bottom: 0; }
+  .om-content em { font-style: italic; color: var(--muted); }
+  .om-content strong { font-weight: 600; }
+  .om-content a {
+    color: var(--fg);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+
+  .om-content .example {
+    border-left: 2px solid var(--hairline-strong);
+    padding: 2px 0 2px 16px;
+    margin: 10px 0 18px;
+    color: var(--muted);
+  }
+  .om-content .example strong { color: var(--fg); }
+
+  @media (min-width: 600px) {
+    body { font-size: 17px; }
+    header { padding: 22px 24px 18px; }
+    .wordmark .mark { font-size: 24px; }
+    .wordmark .tagline { font-size: 11px; }
+    .nav-link { font-size: 12px; }
+    main { padding: 0 24px 80px; }
+    h1.page-title { font-size: 44px; margin: 56px 0 32px; }
+    .om-content { font-size: 18px; }
+  }
+  @media (min-width: 900px) {
+    header { padding: 28px 40px 24px; }
+    .wordmark .mark { font-size: 28px; }
+    main { padding: 0 40px 80px; }
+    h1.page-title { font-size: 56px; margin: 72px 0 40px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="wordmark wordmark-link">
+    <span class="mark">Ärligt talat</span>
+    <span class="tagline">Faktakoll mot SCB</span>
+  </a>
+  <div class="header-nav">
+    <a href="/tips" class="nav-link">Tips</a>
+    <a href="/" class="nav-link">Till chatten</a>
+  </div>
+</header>
+
+<main>
+  <h1 class="page-title">Om Kolla fakta</h1>
+  <div class="om-content">
+
+    <p>Kolla fakta är ett verktyg som granskar politikers påståenden inför valet. Vad stämmer? Vad är bara delvis sant?</p>
+
+    <p>Statistik kan hjälpa oss att förstå verkligheten, men den kan också användas för att få något att se bättre eller sämre ut än det faktiskt är.</p>
+
+    <p>Ett vanligt misstag är att blanda ihop <strong>korrelation</strong> och <strong>kausalitet</strong>. Korrelation betyder att två saker hänger ihop. Kausalitet betyder att den ena orsakar den andra. Bara för att två saker hänger ihop betyder det inte att den ena orsakar den andra.</p>
+
+    <p class="example"><strong>Exempel:</strong> När glassförsäljningen ökar, ökar också antalet drunkningsolyckor. Det betyder inte att glass orsakar drunkningsolyckor. Båda ökar eftersom det är sommar och fler badar.</p>
+
+    <p>En annan tankevurpa är att se en <strong>inzoomad graf</strong>. Om y-axeln börjar på till exempel 98 i stället för 0 kan en liten förändring se ut som en stor ökning.</p>
+
+    <p class="example"><strong>Exempel:</strong> Om arbetslösheten ökar från 4,0 till 4,2 procent är ökningen egentligen liten. Men i en inzoomad graf kan det se ut som att arbetslösheten har skjutit i höjden.</p>
+
+    <p>Kolla fakta är <strong>politiskt obundet</strong> och öppet för granskning. Du ska kunna känna dig trygg med hur slutsatserna dras, därför är både metoden och källkoden öppna för alla.</p>
+
+  </div>
+</main>
+
+</body>
+</html>

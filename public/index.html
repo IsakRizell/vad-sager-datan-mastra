@@ -3,8 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#FFFFFF">
+<meta name="theme-color" content="#F7F5F0">
 <title>Ärligt talat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
   :root {
     --bg: #F7F5F0;
@@ -24,7 +27,7 @@
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
-    font-family: "Helvetica Neue", Helvetica, "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue", Helvetica, sans-serif;
     background: var(--bg);
     color: var(--fg);
     font-size: 15px;
@@ -33,6 +36,7 @@
     display: flex; flex-direction: column;
     overflow-x: hidden;
   }
+  /* Sora = rubriker + logga · Inter = brödtext (default på body) · IBM Plex Mono = siffror/tabeller/badges */
 
   ::selection { background: #111; color: #fff; }
 
@@ -53,35 +57,49 @@
   }
   .wordmark { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
   .wordmark .mark {
-    font-size: 12px; font-weight: 500;
-    letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--fg);
+    font-family: "Sora", -apple-system, system-ui, sans-serif;
+    font-size: 20px; font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #C59B3A;
     white-space: nowrap;
+    line-height: 1.1;
   }
   .wordmark .tagline {
-    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    font-family: "Sora", -apple-system, system-ui, sans-serif;
+    font-size: 10px; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--muted);
     white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis;
   }
-  #reset-btn {
+  .header-nav {
+    display: flex; flex-direction: row; align-items: center;
+    gap: 14px; flex-shrink: 0; flex-wrap: nowrap;
+  }
+  .nav-link, #reset-btn {
     background: transparent; color: var(--fg);
     border: none;
     padding: 8px 4px;
-    font-family: inherit; font-size: 10px;
+    font-family: inherit; font-size: 11px;
     letter-spacing: 0.14em; text-transform: uppercase;
     cursor: pointer; position: relative;
     flex-shrink: 0;
     min-height: 44px;
     display: flex; align-items: center;
+    text-decoration: none;
+    white-space: nowrap;
   }
-  #reset-btn::after {
+  .nav-link::after, #reset-btn::after {
     content: ""; position: absolute;
     left: 4px; right: 4px; bottom: 4px; height: 1px;
     background: var(--fg); transform: scaleX(0); transform-origin: left;
     transition: transform 200ms ease-out;
   }
-  #reset-btn:hover::after { transform: scaleX(1); }
+  .nav-link:hover::after, #reset-btn:hover::after { transform: scaleX(1); }
+  .wordmark-link {
+    text-decoration: none; color: inherit;
+    display: flex; flex-direction: column; gap: 3px;
+    min-width: 0; flex: 1;
+  }
 
   /* ── Main ───────────────────────────────────────────── */
   main {
@@ -103,7 +121,8 @@
   #messages:empty::before {
     content: "Faktakoll. Från citat till siffra.";
     display: block;
-    font-size: 24px; font-weight: 500; line-height: 1.2;
+    font-family: "Sora", -apple-system, system-ui, sans-serif;
+    font-size: 24px; font-weight: 600; line-height: 1.2;
     letter-spacing: -0.01em;
     color: var(--fg);
     max-width: 580px;
@@ -169,7 +188,8 @@
   }
   details.step[open] > summary::before { content: "−"; }
   .step-badge {
-    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--muted); min-width: 56px; flex-shrink: 0;
   }
   .step.kind-action .step-badge { color: var(--action); }
@@ -181,6 +201,7 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .step-meta {
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
     color: var(--muted); font-size: 10px;
     letter-spacing: 0.08em; text-transform: uppercase;
     font-variant-numeric: tabular-nums;
@@ -197,7 +218,7 @@
     background: var(--code-bg);
     padding: 12px 14px;
     overflow-x: auto;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 11px; line-height: 1.5;
     margin: 0; white-space: pre-wrap; word-break: break-word;
     color: #1a1a1a;
@@ -238,17 +259,17 @@
     color: var(--muted); margin-bottom: 14px;
   }
   .final-answer h1, .final-answer h2, .final-answer h3 {
-    line-height: 1.2; margin: 22px 0 8px;
-    font-weight: 500; letter-spacing: -0.005em;
+    font-family: "Sora", -apple-system, system-ui, sans-serif;
+    line-height: 1.15; margin: 28px 0 10px;
+    font-weight: 700; letter-spacing: -0.015em;
+    color: var(--fg);
   }
-  .final-answer h1 { font-size: 22px; }
-  .final-answer h2 { font-size: 18px; }
-  .final-answer h3 {
-    font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em;
-    color: var(--muted); margin-top: 20px; font-weight: 500;
-  }
+  .final-answer h1 { font-size: 28px; }
+  .final-answer h2 { font-size: 22px; }
+  .final-answer h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.005em; }
   .final-answer h1:first-of-type, .final-answer h2:first-of-type, .final-answer h3:first-of-type { margin-top: 0; }
   .final-answer table {
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
     border-collapse: collapse; margin: 14px 0; font-size: 13px;
     width: 100%; font-variant-numeric: tabular-nums;
     display: block; overflow-x: auto;
@@ -267,7 +288,7 @@
   .final-answer code {
     background: var(--code-bg); padding: 1px 5px;
     font-size: 0.88em;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   }
   .final-answer strong { font-weight: 500; }
 
@@ -356,23 +377,25 @@
   #message:focus { outline: none; border-bottom-color: var(--fg); }
 
   #submit {
-    padding: 12px 16px;
-    background: var(--fg); color: #FFFFFF;
-    border: 1px solid var(--fg); border-radius: 0;
-    font-family: inherit; font-size: 10px; font-weight: 500;
-    letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 12px 22px;
+    background: #C59B3A; color: #FFFFFF;
+    border: 1px solid #C59B3A; border-radius: 8px;
+    font-family: "Sora", -apple-system, system-ui, sans-serif;
+    font-size: 14px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
     cursor: pointer;
-    min-height: 44px; min-width: 80px;
+    min-height: 44px; min-width: 90px;
     flex-shrink: 0;
-    transition: background 150ms ease-out, color 150ms ease-out;
+    transition: background 150ms ease-out, border-color 150ms ease-out;
   }
-  #submit:hover { background: #FFFFFF; color: var(--fg); }
-  #submit:disabled { background: var(--fg); color: #FFFFFF; opacity: 0.35; cursor: not-allowed; }
+  #submit:hover { background: #B58A2F; border-color: #B58A2F; }
+  #submit:disabled { opacity: 0.4; cursor: not-allowed; }
   #submit.stopping { background: var(--err); border-color: var(--err); opacity: 1; }
 
   #attach-btn {
     width: 44px; height: 44px;
     border: 1px solid var(--hairline-strong);
+    border-radius: 8px;
     background: transparent;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
@@ -430,9 +453,9 @@
       padding: 22px 24px 18px;
       padding-top: max(22px, env(safe-area-inset-top));
     }
-    .wordmark .mark { font-size: 13px; }
+    .wordmark .mark { font-size: 24px; }
     .wordmark .tagline { font-size: 11px; }
-    #reset-btn { font-size: 11px; padding: 8px 0; }
+    #reset-btn, .nav-link { font-size: 12px; padding: 8px 4px; }
     main { padding: 0 24px; }
     #messages { padding: 40px 0 32px; gap: 48px; }
     #messages:empty::before { margin-top: 80px; font-size: 30px; }
@@ -446,8 +469,9 @@
     .step-body { padding: 4px 0 22px 32px; }
     .step-body pre { font-size: 12px; padding: 14px 16px; }
     .final-answer { font-size: 16px; padding: 26px 0 0; }
-    .final-answer h1 { font-size: 24px; }
-    .final-answer h2 { font-size: 20px; }
+    .final-answer h1 { font-size: 32px; }
+    .final-answer h2 { font-size: 25px; }
+    .final-answer h3 { font-size: 20px; }
     .final-answer table { display: table; font-size: 14px; }
     .final-answer th, .final-answer td { padding: 10px 14px 10px 0; }
     #input-area {
@@ -466,14 +490,16 @@
      ════════════════════════════════════════════════════════════ */
   @media (min-width: 900px) {
     header { padding: 28px 40px 24px; }
+    .wordmark .mark { font-size: 28px; }
     main { padding: 0 40px; }
     #messages { padding: 56px 0 40px; gap: 64px; }
     #messages:empty::before { margin-top: 96px; font-size: 36px; }
     .user .bubble { font-size: 17px; }
     .user .images img { max-width: 240px; max-height: 240px; }
     .final-answer { font-size: 17px; padding: 28px 0 0; }
-    .final-answer h1 { font-size: 28px; margin: 28px 0 10px; }
-    .final-answer h2 { font-size: 22px; }
+    .final-answer h1 { font-size: 36px; margin: 32px 0 12px; }
+    .final-answer h2 { font-size: 28px; }
+    .final-answer h3 { font-size: 22px; }
     #input-area { padding: 24px 40px 32px; }
     #form { gap: 20px; }
     #submit { padding: 14px 28px; }
@@ -485,11 +511,15 @@
 <body>
 
 <header>
-  <div class="wordmark">
+  <a href="/" class="wordmark wordmark-link">
     <span class="mark">Ärligt talat</span>
     <span class="tagline">Faktakoll mot SCB</span>
+  </a>
+  <div class="header-nav">
+    <a href="/tips" class="nav-link">Tips</a>
+    <a href="/om" class="nav-link">Om</a>
+    <button id="reset-btn" type="button">Ny chatt</button>
   </div>
-  <button id="reset-btn" type="button">Ny chatt</button>
 </header>
 
 <main>

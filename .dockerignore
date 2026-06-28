@@ -1,0 +1,11 @@
+node_modules
+.env
+.env.*
+memory.db
+memory.db-shm
+memory.db-wal
+.mastra
+.git
+.gitignore
+*.log
+dist

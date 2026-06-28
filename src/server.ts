@@ -44,8 +44,17 @@ function getSession(sid: string): Session {
 }
 
 const app = new Hono();
-const indexHtml = readFileSync(resolve('public/index.html'), 'utf8');
-app.get('/', (c) => c.html(indexHtml));
+// Läs HTML på varje request i dev (gör CSS-iteration snabb).
+// I prod (NODE_ENV=production) cachar vi en gång.
+let cachedHtml: string | null = null;
+function indexHtml(): string {
+  if (process.env.NODE_ENV === 'production') {
+    if (!cachedHtml) cachedHtml = readFileSync(resolve('public/index.html'), 'utf8');
+    return cachedHtml;
+  }
+  return readFileSync(resolve('public/index.html'), 'utf8');
+}
+app.get('/', (c) => c.html(indexHtml()));
 
 app.post('/chat', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {

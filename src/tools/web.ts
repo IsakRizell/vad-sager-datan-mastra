@@ -27,11 +27,11 @@ export const fetchUrl = tool({
   description:
     'Hämta innehållet på en URL (artikel, pressmeddelande, regeringen.se, riksbanken.se, mm). ' +
     'Extraherar text, returnerar titel + första ~6000 tecken. ' +
-    'Funkar INTE för Twitter/X-tweets — be om screenshot istället.',
+    'Funkar INTE för Twitter/X-tweets, be om screenshot istället.',
   parameters: z.object({
     url: z.string().describe('Hela URL:en, inkl. https://'),
   }),
-  execute: async ({ url }) => {
+  execute: async ({ url }, opts) => {
     try {
       const r = await fetch(url, {
         headers: {
@@ -40,6 +40,7 @@ export const fetchUrl = tool({
           Accept: 'text/html,application/xhtml+xml',
         },
         redirect: 'follow',
+        signal: opts?.abortSignal,
       });
       if (!r.ok) {
         return { url, error: `HTTP ${r.status} ${r.statusText}` };

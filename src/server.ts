@@ -14,6 +14,7 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { INSTRUCTIONS } from './instructions.js';
 import { searchTables, navigate, getTableMetadata, queryTable } from './tools/scb.js';
 import { fetchUrl } from './tools/web.js';
+import { log, shortenSid } from './logger.js';
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.error('ANTHROPIC_API_KEY saknas — sätt i .env');
@@ -104,15 +105,30 @@ app.post('/chat', async (c) => {
   const userMessage: CoreMessage = { role: 'user', content: userContent };
   const messagesForCall = [...session.history, userMessage];
 
+  const sidShort = shortenSid(sid);
+  const turnStart = Date.now();
+  log.info('chat_start', {
+    sid: sidShort,
+    msg_preview: message.slice(0, 120),
+    msg_len: message.length,
+    images: images.length,
+    history_len: session.history.length,
+  });
+
   return streamSSE(c, async (stream) => {
     const send = (event: string, data: unknown) =>
       stream.writeSSE({ event, data: JSON.stringify(data) });
+
+    let stepCount = 0;
+    let toolCallCount = 0;
+    let toolErrorCount = 0;
+    let textChars = 0;
 
     try {
       const today = new Date().toLocaleDateString('sv-SE');
       const result = streamText({
         model: MODEL,
-        system: `${INSTRUCTIONS}\n\n# Dagens datum\n${today}. Antag inte att senare datum än så ligger "i framtiden" — kolla alltid SCB om du är osäker.`,
+        system: `${INSTRUCTIONS}\n\n# Dagens datum\n${today}. Antag inte att senare datum än så ligger "i framtiden". Kolla alltid SCB om du är osäker.`,
         tools: TOOLS,
         messages: messagesForCall,
         maxSteps: MAX_STEPS,
@@ -122,36 +138,82 @@ app.post('/chat', async (c) => {
 
       for await (const part of result.fullStream) {
         if (ac.signal.aborted) break;
-        // Tool execution errors hanteras av agenten själv (den får ett
-        // tool_result med felmeddelandet och kan välja nästa drag). Vi
-        // loggar serverside men spammar inte klienten.
+
         if (part.type === 'error') {
-          try { console.error('[stream-error]', JSON.stringify(part.error).slice(0, 500)); }
-          catch { console.error('[stream-error]', String(part.error).slice(0, 500)); }
+          try { log.error('stream_error', { sid: sidShort, error: JSON.stringify(part.error).slice(0, 500) }); }
+          catch { log.error('stream_error', { sid: sidShort, error: String(part.error).slice(0, 500) }); }
           continue;
         }
+
+        if (part.type === 'step-start') stepCount++;
+        if (part.type === 'tool-call') {
+          toolCallCount++;
+          log.info('tool_call', {
+            sid: sidShort,
+            tool: part.toolName,
+            args: JSON.stringify(part.args).slice(0, 200),
+          });
+        }
+        if (part.type === 'tool-result') {
+          const r: any = part.result;
+          const failed = r && typeof r === 'object' && r.ok === false;
+          if (failed) toolErrorCount++;
+          log.info('tool_result', {
+            sid: sidShort,
+            tool: part.toolName,
+            ok: !failed,
+            preview: typeof r === 'string'
+              ? r.slice(0, 120)
+              : JSON.stringify(r).slice(0, 120),
+          });
+        }
+        if (part.type === 'text-delta') textChars += (part.textDelta ?? '').length;
+
         await send(part.type, part);
       }
 
       if (ac.signal.aborted) {
+        log.info('chat_interrupted', { sid: sidShort, dur_ms: Date.now() - turnStart, steps: stepCount, tools: toolCallCount });
         await send('interrupted', 'Stoppad av användare.');
         return;
       }
 
-      // Spara user-message + agent-response till historik.
-      const responseMessages = (await result.response).messages;
-      session.history = [...session.history, userMessage, ...responseMessages];
-      // Cap historiken så vi inte sväller obegränsat.
+      const finalResp = await result.response;
+      session.history = [...session.history, userMessage, ...finalResp.messages];
       if (session.history.length > MAX_HISTORY_MESSAGES) {
         session.history = session.history.slice(-MAX_HISTORY_MESSAGES);
       }
 
+      const usage = await result.usage.catch(() => null);
+      log.info('chat_done', {
+        sid: sidShort,
+        dur_ms: Date.now() - turnStart,
+        steps: stepCount,
+        tools: toolCallCount,
+        tool_errors: toolErrorCount,
+        text_chars: textChars,
+        in_tokens: usage?.promptTokens,
+        out_tokens: usage?.completionTokens,
+      });
+
       await send('done', '');
     } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      log.error('chat_error', {
+        sid: sidShort,
+        dur_ms: Date.now() - turnStart,
+        steps: stepCount,
+        tools: toolCallCount,
+        error: msg.slice(0, 500),
+      });
       if (err?.name === 'AbortError' || ac.signal.aborted) {
         await send('interrupted', 'Stoppad av användare.');
+      } else if (msg.includes('tool_use') && msg.includes('tool_result')) {
+        session.history = [];
+        log.warn('session_corrupted_reset', { sid: sidShort });
+        await send('error', 'Konversationen blev korrupt från ett tidigare fel. Rensade minnet, skicka frågan igen.');
       } else {
-        await send('error', `Agent-fel: ${err?.message ?? String(err)}`);
+        await send('error', `Agent-fel: ${msg}`);
       }
     } finally {
       if (session.abort === ac) session.abort = null;
@@ -174,12 +236,39 @@ app.post('/reset', async (c) => {
   if (sid) {
     sessions.get(sid)?.abort?.abort();
     sessions.delete(sid);
+    log.info('session_reset', { sid: shortenSid(sid) });
   }
   deleteCookie(c, SID_COOKIE, { path: '/' });
   return c.json({ ok: true });
 });
 
+// Simple log-viewer för dev. Visar senaste N rader från ./app.log som pretty text.
+app.get('/logs', async (c) => {
+  const { readFileSync } = await import('node:fs');
+  const limit = Math.min(500, Number(c.req.query('n') ?? 200));
+  let raw = '';
+  try {
+    raw = readFileSync(process.env.LOG_FILE ?? './app.log', 'utf8');
+  } catch {
+    return c.text('(ingen logg-fil än)', 200);
+  }
+  const lines = raw.trim().split('\n').slice(-limit);
+  const pretty = lines.map((l) => {
+    try {
+      const o = JSON.parse(l);
+      const { ts, level, ev, ...rest } = o;
+      const time = String(ts).slice(11, 19);
+      return `${time}  ${level.padEnd(5)} ${ev.padEnd(22)} ${JSON.stringify(rest)}`;
+    } catch {
+      return l;
+    }
+  }).join('\n');
+  return c.text(pretty, 200, { 'Content-Type': 'text/plain; charset=utf-8' });
+});
+
 const port = Number(process.env.PORT ?? 8766);
 serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`✓ Vad säger datan på http://localhost:${info.port}`);
+  log.info('server_start', { port: info.port, node_env: process.env.NODE_ENV ?? 'dev' });
+  console.log(`✓ Ärligt talat på http://localhost:${info.port}`);
+  console.log(`  Logs: tail -f app.log  |  http://localhost:${info.port}/logs`);
 });

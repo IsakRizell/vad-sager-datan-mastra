@@ -3,38 +3,53 @@ import { z } from 'zod';
 
 const SCB_BASE = 'https://api.scb.se/OV0104/v1/doris/sv/ssd';
 
-async function getNode(path: string): Promise<any> {
+async function getNode(path: string, signal?: AbortSignal): Promise<any> {
   const url = path ? `${SCB_BASE}/${path}` : SCB_BASE;
-  const r = await fetch(url);
+  const r = await fetch(url, { signal });
   if (!r.ok) throw new Error(`SCB ${r.status} ${r.statusText} (path=${path})`);
   return r.json();
+}
+
+function asErrorResult(err: any, extra: Record<string, unknown> = {}) {
+  if (err?.name === 'AbortError') {
+    return { ok: false, aborted: true, ...extra };
+  }
+  return { ok: false, error: err?.message ?? String(err), ...extra };
 }
 
 export const navigate = tool({
   description:
     "Lista barn-noder i SCB:s katalogträd. path='' ger 22 ämnesområden. " +
-    "Varje barn har type 'l' (level — drilla djupare) eller 't' (tabell, queryable). " +
+    "Varje barn har type 'l' (level, drilla djupare) eller 't' (tabell, queryable). " +
     'Drilla genom att appenda barnets id till path.',
   parameters: z.object({
     path: z.string().describe("T.ex. 'BE/BE0101' eller '' för roten."),
   }),
-  execute: async ({ path }) => {
-    const result = await getNode(path);
-    return Array.isArray(result) ? result : [result];
+  execute: async ({ path }, opts) => {
+    try {
+      const result = await getNode(path, opts?.abortSignal);
+      return Array.isArray(result) ? result : [result];
+    } catch (err) {
+      return asErrorResult(err, { path });
+    }
   },
 });
 
 export const getTableMetadata = tool({
   description:
     'Hämta full metadata för en SCB-tabell: variabler, valueTexts, värdekoder, tidsdimension. ' +
-    'Anropa ALLTID detta innan query_table — du behöver veta variabel-koderna.',
+    'Anropa ALLTID detta innan query_table. Du behöver veta variabel-koderna.',
   parameters: z.object({
     table_id: z
       .string()
       .describe("Full slash-separerad path, t.ex. 'PR/PR0101/PR0101A/KPI2020M'."),
   }),
-  execute: async ({ table_id }) => {
-    return getNode(table_id);
+  execute: async ({ table_id }, opts) => {
+    try {
+      return await getNode(table_id, opts?.abortSignal);
+    } catch (err) {
+      return asErrorResult(err, { table_id });
+    }
   },
 });
 
@@ -58,18 +73,23 @@ export const queryTable = tool({
     table_id: z.string(),
     query: z.array(querySchema).describe('Lista av variabel-filter.'),
   }),
-  execute: async ({ table_id, query }) => {
-    const body = { query, response: { format: 'json' } };
-    const r = await fetch(`${SCB_BASE}/${table_id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) {
-      const text = await r.text();
-      throw new Error(`SCB query ${r.status}: ${text.slice(0, 300)}`);
+  execute: async ({ table_id, query }, opts) => {
+    try {
+      const body = { query, response: { format: 'json' } };
+      const r = await fetch(`${SCB_BASE}/${table_id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: opts?.abortSignal,
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        return asErrorResult(new Error(`SCB ${r.status}: ${text.slice(0, 300)}`), { table_id });
+      }
+      return await r.json();
+    } catch (err) {
+      return asErrorResult(err, { table_id });
     }
-    return r.json();
   },
 });
 
@@ -86,7 +106,8 @@ export const searchTables = tool({
     max_results: z.number().int().optional().default(30),
     max_depth: z.number().int().optional().default(6),
   }),
-  execute: async ({ keyword, start_path, max_results, max_depth }) => {
+  execute: async ({ keyword, start_path, max_results, max_depth }, opts) => {
+    const signal = opts?.abortSignal;
     const needle = keyword.toLowerCase();
     const mr = max_results ?? 30;
     const md = max_depth ?? 6;
@@ -94,10 +115,11 @@ export const searchTables = tool({
     const queue: Array<[string, number]> = [[start_path ?? '', 0]];
 
     while (queue.length && results.length < mr) {
+      if (signal?.aborted) return { ok: false, aborted: true };
       const [path, depth] = queue.shift()!;
       let children: any;
       try {
-        children = await getNode(path);
+        children = await getNode(path, signal);
       } catch {
         continue;
       }

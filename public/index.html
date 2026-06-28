@@ -101,13 +101,19 @@
   }
   #messages:empty { display: block; }
   #messages:empty::before {
-    content: "Introduction";
-    display: block; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--muted); margin: 40px 0 14px;
+    content: "Faktakoll. Från citat till siffra.";
+    display: block;
+    font-size: 24px; font-weight: 500; line-height: 1.2;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+    max-width: 580px;
+    margin: 48px 0 16px;
   }
   #messages:empty::after {
-    content: "Klistra in ett politiker-citat, en länk eller en screenshot. Agenten letar SCB-data, jämför och redovisar varje steg.";
-    display: block; font-size: 16px; line-height: 1.5; color: var(--fg);
+    content: "Klistra in ett politiker-citat, en länk eller en screenshot. Faktakollaren jämför mot SCB:s officiella statistik och visar tabellerna, siffrorna och hela resonemanget, steg för steg.";
+    display: block;
+    font-size: 16px; line-height: 1.6;
+    color: var(--muted);
     max-width: 580px;
   }
 
@@ -171,8 +177,7 @@
   .step-title {
     flex: 1; min-width: 0;
     color: var(--fg);
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: 11px;
+    font-size: 13px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .step-meta {
@@ -210,7 +215,7 @@
     overflow-wrap: anywhere;
   }
   .final-answer::before {
-    content: "Verdict";
+    content: "Svar";
     display: block; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
     color: var(--muted); margin-bottom: 14px;
   }
@@ -412,13 +417,13 @@
     #reset-btn { font-size: 11px; padding: 8px 0; }
     main { padding: 0 24px; }
     #messages { padding: 40px 0 32px; gap: 48px; }
-    #messages:empty::before { margin-top: 72px; font-size: 11px; }
+    #messages:empty::before { margin-top: 80px; font-size: 30px; }
     #messages:empty::after { font-size: 17px; }
     .turn.user::before, .turn.agent::before { font-size: 11px; }
     .user .bubble { font-size: 16px; padding-left: 16px; }
     .user .images img { max-width: 220px; max-height: 220px; }
     .step-badge { font-size: 10px; min-width: 64px; }
-    .step-title { font-size: 12px; }
+    .step-title { font-size: 14px; }
     .step-meta { font-size: 11px; }
     .step-body { padding: 4px 0 22px 32px; }
     .step-body pre { font-size: 12px; padding: 14px 16px; }
@@ -445,7 +450,7 @@
     header { padding: 28px 40px 24px; }
     main { padding: 0 40px; }
     #messages { padding: 56px 0 40px; gap: 64px; }
-    #messages:empty::before { margin: 96px 0 16px; }
+    #messages:empty::before { margin-top: 96px; font-size: 36px; }
     .user .bubble { font-size: 17px; }
     .user .images img { max-width: 240px; max-height: 240px; }
     .final-answer { font-size: 17px; padding: 28px 0 0; }
@@ -491,7 +496,7 @@
       <a data-fill="Sverige är i en djup lågkonjunktur men svensk ekonomi är inte i kris.">Lågkonjunktur</a>
       <a data-fill="Inflationen i Sverige är nu nere på 0.8 procent, vilket är långt under Riksbankens mål om 2 procent.">Inflation</a>
       <a data-fill="Över 700 000 personer lever i fattigdom i Sverige. Det är dubbelt så många som när regeringen Kristersson tillträdde.">Fattigdom</a>
-      <span class="hint"><kbd>Esc</kbd> avbryter · <kbd>Cmd+V</kbd> bild</span>
+      <span class="hint"><kbd>Esc</kbd> avbryter</span>
     </div>
   </div>
 </main>
@@ -524,6 +529,8 @@ let stepCounter = 0;
 let isStreaming = false;
 let userIsAtBottom = true;
 let pendingImages = [];
+let currentReader = null;
+let userStopped = false;
 
 const NEAR_BOTTOM_PX = 80;
 
@@ -648,11 +655,29 @@ msgInput.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isStreaming) {
     e.preventDefault();
-    fetch('/stop', { method: 'POST' });
-    submitBtn.textContent = 'Stoppar';
-    submitBtn.classList.add('stopping');
+    stopAgent();
   }
 });
+
+function stopAgent() {
+  if (!isStreaming) return;
+  userStopped = true;
+  // Fire-and-forget — vi väntar inte på servern.
+  fetch('/stop', { method: 'POST' }).catch(() => {});
+  // Stäng streamen direkt klientsidan — UI:t blir omedelbart responsivt.
+  if (currentReader) {
+    try { currentReader.cancel(); } catch {}
+    currentReader = null;
+  }
+  if (currentStatusEl) currentStatusEl.textContent = '';
+  if (currentAgentTurn) {
+    const msg = document.createElement('div');
+    msg.className = 'interrupted-msg';
+    msg.textContent = '⏹ Stoppad';
+    currentAgentTurn.appendChild(msg);
+  }
+  // finally-blocket i submit-handlern återställer knappen.
+}
 
 resetBtn.addEventListener('click', async () => {
   await fetch('/reset', { method: 'POST' });
@@ -676,6 +701,7 @@ form.addEventListener('submit', async (e) => {
   renderThumbs();
   autoResize();
   isStreaming = true;
+  userStopped = false;
   submitBtn.disabled = true;
   submitBtn.textContent = 'Granskar';
   submitBtn.classList.remove('stopping');
@@ -700,10 +726,18 @@ form.addEventListener('submit', async (e) => {
       return;
     }
     const reader = res.body.getReader();
+    currentReader = reader;
     const decoder = new TextDecoder();
     let pending = '';
     while (true) {
-      const { done, value } = await reader.read();
+      let chunk;
+      try {
+        chunk = await reader.read();
+      } catch (err) {
+        // reader.cancel() triggar AbortError — det är förväntat när användaren tryckt ESC
+        break;
+      }
+      const { done, value } = chunk;
       if (done) break;
       pending += decoder.decode(value, { stream: true });
       const chunks = pending.split('\n\n');
@@ -725,14 +759,15 @@ form.addEventListener('submit', async (e) => {
         scrollToBottomIfAtBottom();
       }
     }
-    // Streamet stängde — om vi inte sett done/finish är det troligen serversidans connection drop
-    // (fly.io kallstart, proxy-timeout, eller agenten kraschade utan att skicka error).
-    if (!sawTerminator) {
+    // Streamet stängde — om användaren inte stoppade och vi inte sett done/finish
+    // är det en oväntad connection drop (fly kallstart, proxy-timeout, kraschad agent).
+    if (!sawTerminator && !userStopped) {
       showError('Anslutningen bröts. Försök igen (servern kan ha startat om).');
     }
   } catch (err) {
-    showError('Anslutningsfel: ' + err.message);
+    if (!userStopped) showError('Anslutningsfel: ' + err.message);
   } finally {
+    currentReader = null;
     if (currentStatusEl) currentStatusEl.textContent = '';
     isStreaming = false;
     submitBtn.disabled = false;
@@ -773,7 +808,7 @@ function startAgentTurn() {
 
   currentStatusEl = document.createElement('div');
   currentStatusEl.className = 'status';
-  currentStatusEl.textContent = 'Agenten startar';
+  currentStatusEl.textContent = 'Tänker…';
 
   currentFinalEl = document.createElement('div');
   currentFinalEl.className = 'final-answer';
@@ -798,7 +833,7 @@ function handleEvent(type, data) {
         currentFinalEl.innerHTML = renderMarkdown(verdictBuffer);
         currentFinalEl.style.display = 'block';
       }
-      if (currentStatusEl) currentStatusEl.textContent = 'Skriver svar';
+      if (currentStatusEl) currentStatusEl.textContent = 'Skriver…';
       break;
     }
     case 'tool-call': addToolCall(data); break;
@@ -806,7 +841,7 @@ function handleEvent(type, data) {
     case 'reasoning':
     case 'reasoning-delta': break;
     case 'step-start':
-      if (currentStatusEl) currentStatusEl.textContent = 'Tänker';
+      if (currentStatusEl) currentStatusEl.textContent = 'Tänker…';
       break;
     case 'step-finish': break;
     case 'finish':
@@ -839,13 +874,65 @@ function handleEvent(type, data) {
   }
 }
 
+const SCB_TOPICS = {
+  AA: 'Ämnesövergripande', AM: 'Arbetsmarknad', BE: 'Befolkning',
+  BO: 'Boende & byggande', EN: 'Energi', FM: 'Finansmarknad', HA: 'Handel',
+  HE: 'Hushållens ekonomi', HS: 'Hälso- och sjukvård', JO: 'Jord & skog',
+  KU: 'Kultur & fritid', LE: 'Levnadsförhållanden', ME: 'Demokrati',
+  MI: 'Miljö', NR: 'Nationalräkenskaper', NV: 'Näringsverksamhet',
+  OE: 'Offentlig ekonomi', PR: 'Priser', SO: 'Socialtjänst',
+  TK: 'Transporter', UF: 'Utbildning', OV: 'Övrigt',
+};
+
+function friendlyToolLabel(toolName, args) {
+  args = args || {};
+  switch (toolName) {
+    case 'navigate': {
+      const path = args.path || '';
+      if (!path) return 'Letar i SCB-katalogen';
+      const [topic, ...rest] = path.split('/');
+      const topicLabel = SCB_TOPICS[topic] || topic;
+      const sub = rest.join('/');
+      return sub ? `Letar i ${topicLabel} › ${sub}` : `Letar i ${topicLabel}`;
+    }
+    case 'searchTables': {
+      const kw = args.keyword || '';
+      return kw ? `Söker SCB efter "${kw}"` : 'Söker SCB';
+    }
+    case 'getTableMetadata': {
+      const tid = (args.table_id || '').split('/').pop() || '?';
+      return `Tittar på tabell ${tid}`;
+    }
+    case 'queryTable': {
+      const tid = (args.table_id || '').split('/').pop() || '?';
+      return `Hämtar data från ${tid}`;
+    }
+    case 'fetchUrl': {
+      const u = args.url || '';
+      try { return `Läser ${new URL(u).hostname}`; } catch { return `Läser ${u.slice(0, 40)}`; }
+    }
+    default:
+      return toolName;
+  }
+}
+
+function friendlyStatus(toolName) {
+  switch (toolName) {
+    case 'navigate':           return 'Letar i katalogen';
+    case 'searchTables':       return 'Söker SCB';
+    case 'getTableMetadata':   return 'Hämtar tabellinfo';
+    case 'queryTable':         return 'Hämtar SCB-data';
+    case 'fetchUrl':           return 'Läser artikel';
+    default:                   return 'Kör verktyg';
+  }
+}
+
 function addToolCall(data) {
   if (!data) return;
   const callId = data.toolCallId || data.id || `tc-${Date.now()}-${Math.random()}`;
   const toolName = data.toolName || data.name || 'okänt';
   const args = data.args || data.arguments || {};
-  const argsStr = JSON.stringify(args);
-  const argsShort = argsStr.length > 80 ? argsStr.slice(0, 77) + '…' : argsStr;
+  const friendly = friendlyToolLabel(toolName, args);
   stepCounter++;
 
   const det = document.createElement('details');
@@ -854,18 +941,19 @@ function addToolCall(data) {
   det.innerHTML = `
     <summary>
       <span class="step-badge">Steg ${String(stepCounter).padStart(2, '0')}</span>
-      <span class="step-title">${escapeHtml(toolName)}(${escapeHtml(argsShort)})</span>
+      <span class="step-title">${escapeHtml(friendly)}</span>
       <span class="step-meta">Kör…</span>
     </summary>
     <div class="step-body"></div>
   `;
   const body = det.querySelector('.step-body');
+  body.appendChild(makeSection('Verktyg', toolName, 'thought'));
   body.appendChild(makeSection('Argument', JSON.stringify(args, null, 2), 'thought'));
   body.appendChild(makeSection('Resultat', '(väntar)', 'observation'));
   currentStepsEl.appendChild(det);
   toolCardsByCallId.set(callId, det);
 
-  if (currentStatusEl) currentStatusEl.textContent = `Anropar ${toolName}`;
+  if (currentStatusEl) currentStatusEl.textContent = friendlyStatus(toolName);
 }
 
 function addToolResult(data) {

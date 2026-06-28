@@ -109,9 +109,10 @@ app.post('/chat', async (c) => {
       stream.writeSSE({ event, data: JSON.stringify(data) });
 
     try {
+      const today = new Date().toLocaleDateString('sv-SE');
       const result = streamText({
         model: MODEL,
-        system: INSTRUCTIONS,
+        system: `${INSTRUCTIONS}\n\n# Dagens datum\n${today}. Antag inte att senare datum än så ligger "i framtiden" — kolla alltid SCB om du är osäker.`,
         tools: TOOLS,
         messages: messagesForCall,
         maxSteps: MAX_STEPS,
@@ -121,6 +122,14 @@ app.post('/chat', async (c) => {
 
       for await (const part of result.fullStream) {
         if (ac.signal.aborted) break;
+        // Tool execution errors hanteras av agenten själv (den får ett
+        // tool_result med felmeddelandet och kan välja nästa drag). Vi
+        // loggar serverside men spammar inte klienten.
+        if (part.type === 'error') {
+          try { console.error('[stream-error]', JSON.stringify(part.error).slice(0, 500)); }
+          catch { console.error('[stream-error]', String(part.error).slice(0, 500)); }
+          continue;
+        }
         await send(part.type, part);
       }
 

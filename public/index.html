@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#FFFFFF">
-<title>Vad säger datan?</title>
+<title>Ärligt talat</title>
 <style>
   :root {
     --bg: #FFFFFF;
@@ -347,6 +347,22 @@
   #submit:disabled { background: var(--fg); color: #FFFFFF; opacity: 0.35; cursor: not-allowed; }
   #submit.stopping { background: var(--err); border-color: var(--err); opacity: 1; }
 
+  #attach-btn {
+    width: 44px; height: 44px;
+    border: 1px solid var(--hairline-strong);
+    background: transparent;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
+    color: var(--fg);
+    transition: background 150ms ease-out;
+  }
+  #attach-btn:hover { background: var(--bg-soft); }
+  #attach-btn:active { background: var(--code-bg); }
+  #attach-btn svg { width: 18px; height: 18px; display: block; }
+  #file-input { display: none; }
+
   .examples {
     max-width: 880px; margin: 12px auto 0;
     display: flex; flex-wrap: wrap;
@@ -447,7 +463,7 @@
 
 <header>
   <div class="wordmark">
-    <span class="mark">Vad säger datan</span>
+    <span class="mark">Ärligt talat</span>
     <span class="tagline">Faktakoll mot SCB</span>
   </div>
   <button id="reset-btn" type="button">Ny chatt</button>
@@ -461,7 +477,13 @@
   <div id="input-area">
     <div id="image-strip"></div>
     <form id="form">
-      <textarea id="message" rows="1" placeholder="Skriv eller klistra in…"></textarea>
+      <textarea id="message" rows="1" placeholder="Vad granskar vi?"></textarea>
+      <input type="file" id="file-input" accept="image/*" multiple>
+      <button type="button" id="attach-btn" title="Bifoga bild">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.5l-8.5 8.5a5 5 0 01-7-7L14 5.5a3.5 3.5 0 014.95 4.95L10.5 19"/>
+        </svg>
+      </button>
       <button type="submit" id="submit">Skicka</button>
     </form>
     <div class="examples">
@@ -483,6 +505,14 @@ const resetBtn = document.getElementById('reset-btn');
 const inputArea = document.getElementById('input-area');
 const imageStrip = document.getElementById('image-strip');
 const jumpDown = document.getElementById('jump-down');
+const attachBtn = document.getElementById('attach-btn');
+const fileInput = document.getElementById('file-input');
+
+attachBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', async () => {
+  for (const file of fileInput.files) await addImageFile(file);
+  fileInput.value = '';
+});
 
 let currentAgentTurn = null;
 let currentStepsEl = null;
